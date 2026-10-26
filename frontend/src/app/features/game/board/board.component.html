@@ -1,0 +1,20 @@
+<div class="board" role="grid" [style.grid-template-columns]="'repeat(' + width() + ', 1fr)'" (mouseleave)="onLeave()">
+  @for (row of grid(); track $index; let y = $index) {
+    @for (orb of row; track $index; let x = $index) {
+      <button
+        type="button"
+        class="cell"
+        [class]="'cell orb-' + orb"
+        [class.preview]="previewKeys().has(y * width() + x)"
+        [class.anchor]="isAnchor(x, y)"
+        [disabled]="disabled()"
+        [attr.aria-label]="label(orb) + ' (' + (x + 1) + ', ' + (y + 1) + ')'"
+        [title]="label(orb)"
+        (mouseenter)="onHover(x, y)"
+        (focus)="onHover(x, y)"
+        (blur)="onLeave()"
+        (click)="onCellClick(x, y)"
+      ></button>
+    }
+  }
+</div>

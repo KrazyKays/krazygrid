@@ -1,0 +1,47 @@
+.board {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  background: #1e1b2e;
+  border-radius: 14px;
+  width: min(92vw, 480px);
+  aspect-ratio: 1;
+  box-sizing: border-box;
+}
+
+.cell {
+  border: 2px solid transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.08s ease, box-shadow 0.08s ease, border-color 0.08s ease;
+  background: radial-gradient(circle at 35% 30%, #d9d9e6, #7d7b92);
+}
+
+.cell:disabled {
+  cursor: default;
+}
+
+.cell.orb-gold {
+  background: radial-gradient(circle at 35% 30%, #fff3a6, #f5b400 55%, #b07a00);
+  box-shadow: 0 0 8px rgba(245, 180, 0, 0.5);
+}
+
+.cell.orb-bomb {
+  background: radial-gradient(circle at 35% 30%, #6b6b6b, #222 60%, #000);
+  box-shadow: inset 0 0 0 2px #e53935;
+}
+
+.cell.preview {
+  border-color: #7ee0ff;
+  transform: scale(1.06);
+}
+
+.cell.anchor {
+  border-color: #ffffff;
+  box-shadow: 0 0 12px #7ee0ff;
+}
+
+.cell:not(:disabled):hover {
+  transform: scale(1.08);
+}
