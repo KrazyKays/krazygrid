@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, OnInit } from '@angular/core';
 import { GameStore } from '../../../core/game/game-store.service';
+import { START_LIVES } from '../../../core/engine/game-engine';
 import { Cell, ShapeId } from '../../../core/models/game.models';
 import { BoardComponent } from '../board/board.component';
 
@@ -27,6 +28,11 @@ export class GamePageComponent implements OnInit {
 
   ngOnInit(): void {
     this.store.newGame();
+  }
+
+  /** Vies affichées en cœurs pleins (restantes) et vides (perdues). */
+  protected hearts(lives: number): string {
+    return '♥'.repeat(Math.max(lives, 0)) + '♡'.repeat(Math.max(START_LIVES - lives, 0));
   }
 
   protected onCellClick(cell: Cell): void {

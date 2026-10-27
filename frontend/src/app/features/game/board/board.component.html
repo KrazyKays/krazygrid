@@ -1,12 +1,21 @@
-<div class="board" role="grid" [style.grid-template-columns]="'repeat(' + width() + ', 1fr)'" (mouseleave)="onLeave()">
+<div
+  class="board"
+  role="grid"
+  [class.disabled]="disabled()"
+  [style.grid-template-columns]="'repeat(' + width() + ', 1fr)'"
+  (mouseleave)="onLeave()"
+>
   @for (row of grid(); track $index; let y = $index) {
-    @for (orb of row; track $index; let x = $index) {
+    @for (orb of row; track castCount() + '-' + $index; let x = $index) {
       <button
         type="button"
         class="cell"
         [class]="'cell orb-' + orb"
         [class.preview]="previewKeys().has(y * width() + x)"
         [class.anchor]="isAnchor(x, y)"
+        [class.hit-gold]="hitOrb(x, y) === 'gold'"
+        [class.hit-bomb]="hitOrb(x, y) === 'bomb'"
+        [class.hit-neutral]="hitOrb(x, y) === 'neutral'"
         [disabled]="disabled()"
         [attr.aria-label]="label(orb) + ' (' + (x + 1) + ', ' + (y + 1) + ')'"
         [title]="label(orb)"

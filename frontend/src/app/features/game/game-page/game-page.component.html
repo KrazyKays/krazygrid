@@ -9,7 +9,7 @@
         <span class="label">Niveau</span>
         <span class="value">{{ state.level }}</span>
       </div>
-      <div class="stat">
+      <div class="stat" [class.warn]="state.turnsLeft <= 2 && state.status === 'playing'">
         <span class="label">Tours restants</span>
         <span class="value">{{ state.turnsLeft }} / {{ state.maxTurns }}</span>
       </div>
@@ -19,11 +19,11 @@
       </div>
       <div class="stat">
         <span class="label">Vies</span>
-        <span class="value">{{ state.lives }}</span>
+        <span class="value hearts" [attr.title]="state.lives + ' vie(s)'">{{ hearts(state.lives) }}</span>
       </div>
       <div class="stat">
         <span class="label">Or</span>
-        <span class="value">{{ state.gold }}</span>
+        <span class="value gold-value">{{ state.gold }}</span>
       </div>
     </section>
 
@@ -50,10 +50,12 @@
       [grid]="state.grid"
       [shape]="store.selectedShape()"
       [disabled]="state.status !== 'playing'"
+      [report]="store.lastReport()"
+      [castCount]="store.castCount()"
       (cellClick)="onCellClick($event)"
     />
 
-    <p class="message" aria-live="polite">{{ store.message() }}</p>
+    <p class="message" [class]="'message tone-' + store.messageTone()" aria-live="polite">{{ store.message() }}</p>
 
     <div class="actions">
       <button type="button" class="primary" (click)="store.newGame()">

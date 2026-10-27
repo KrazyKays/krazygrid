@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 import { shapeCells } from '../../../core/engine/game-engine';
-import { Cell, OrbType, ShapeId } from '../../../core/models/game.models';
+import { Cell, CastReport, OrbType, ShapeId } from '../../../core/models/game.models';
 
 const ORB_LABELS: Record<OrbType, string> = {
   gold: 'Bille dorée (trésor)',
@@ -18,6 +18,10 @@ export class BoardComponent {
   readonly grid = input.required<OrbType[][]>();
   readonly shape = input.required<ShapeId>();
   readonly disabled = input(false);
+  /** Dernier sort joué, utilisé pour animer les cases touchées. */
+  readonly report = input<CastReport | null>(null);
+  /** Change à chaque sort : force le rejeu des animations même sur une case déjà touchée. */
+  readonly castCount = input(0);
 
   readonly cellClick = output<Cell>();
 
@@ -36,8 +40,23 @@ export class BoardComponent {
     return new Set(cells.map((cell) => cell.y * this.width() + cell.x));
   });
 
+  /** Orbe d'origine de chaque case touchée par le dernier sort (clé y * width + x). */
+  private readonly hitOrbs = computed(() => {
+    const report = this.report();
+    const hits = new Map<number, OrbType>();
+    if (!report) {
+      return hits;
+    }
+    report.cells.forEach((cell, i) => hits.set(cell.y * this.width() + cell.x, report.previousOrbs[i]));
+    return hits;
+  });
+
   protected label(orb: OrbType): string {
     return ORB_LABELS[orb];
+  }
+
+  protected hitOrb(x: number, y: number): OrbType | undefined {
+    return this.hitOrbs().get(y * this.width() + x);
   }
 
   protected isAnchor(x: number, y: number): boolean {

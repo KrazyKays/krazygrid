@@ -44,6 +44,13 @@ h1 {
   flex-direction: column;
   align-items: center;
   gap: 2px;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stat.warn {
+  background: #4a1d2a;
+  box-shadow: inset 0 0 0 1px #ff6b81;
+  animation: warn-pulse 1.2s ease-in-out infinite;
 }
 
 .label {
@@ -57,6 +64,16 @@ h1 {
   font-size: 1rem;
 }
 
+.hearts {
+  color: #ff6b81;
+  letter-spacing: 1px;
+  font-size: 0.9rem;
+}
+
+.gold-value {
+  color: #ffe27a;
+}
+
 .progress {
   width: 100%;
   height: 8px;
@@ -68,7 +85,7 @@ h1 {
 .progress-fill {
   height: 100%;
   background: linear-gradient(90deg, #f5b400, #ffe27a);
-  transition: width 0.2s ease;
+  transition: width 0.4s ease;
 }
 
 .shapes {
@@ -86,10 +103,24 @@ h1 {
   display: flex;
   flex-direction: column;
   align-items: center;
+  transition: transform 0.1s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.shape:hover {
+  background: #2c2644;
+  transform: translateY(-1px);
+}
+
+.shape:focus-visible,
+button.primary:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
 }
 
 .shape.active {
   border-color: #7ee0ff;
+  background: #1d2f42;
+  box-shadow: 0 0 10px rgba(126, 224, 255, 0.35);
 }
 
 .shape-hint {
@@ -101,6 +132,20 @@ h1 {
   min-height: 1.4em;
   margin: 0;
   text-align: center;
+  transition: color 0.2s ease;
+}
+
+.message.tone-good {
+  color: #ffe27a;
+}
+
+.message.tone-bad {
+  color: #ff8a80;
+}
+
+.message.tone-level {
+  color: #7ee0ff;
+  font-weight: 700;
 }
 
 .actions {
@@ -116,6 +161,12 @@ button.primary {
   padding: 10px 18px;
   font-weight: 700;
   cursor: pointer;
+  transition: transform 0.1s ease, filter 0.15s ease;
+}
+
+button.primary:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
 }
 
 button:disabled {
@@ -160,6 +211,7 @@ button:disabled {
   display: flex;
   align-items: center;
   justify-content: center;
+  animation: fade-in 0.25s ease-out;
 }
 
 .overlay-card {
@@ -170,8 +222,56 @@ button:disabled {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  animation: card-in 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.2);
 }
 
 .loading {
   opacity: 0.7;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes card-in {
+  from {
+    transform: scale(0.9) translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes warn-pulse {
+  0%,
+  100% {
+    box-shadow: inset 0 0 0 1px #ff6b81;
+  }
+  50% {
+    box-shadow: inset 0 0 0 1px #ff6b81, 0 0 12px rgba(255, 107, 129, 0.45);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay,
+  .overlay-card,
+  .stat.warn {
+    animation: none;
+  }
+
+  .shape,
+  button.primary,
+  .progress-fill,
+  .message,
+  .stat {
+    transition: none;
+  }
 }

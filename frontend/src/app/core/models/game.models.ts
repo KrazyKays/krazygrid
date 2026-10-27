@@ -24,6 +24,8 @@ export interface GameState {
 
 export interface CastReport {
   cells: Cell[];
+  /** Orbe présent sur chaque case de `cells` avant le sort (même ordre). */
+  previousOrbs: OrbType[];
   treasuresGained: number;
   moneyGained: number;
   bombsHit: number;

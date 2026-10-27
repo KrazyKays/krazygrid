@@ -127,9 +127,11 @@ export function cast(state: GameState, shape: ShapeId, x: number, y: number): Ca
   let rng = state.rng;
   let treasuresGained = 0;
   let bombsHit = 0;
+  const previousOrbs: OrbType[] = [];
 
   for (const cell of cells) {
     const orb = grid[cell.y][cell.x];
+    previousOrbs.push(orb);
     if (orb === 'gold') {
       treasuresGained++;
     } else if (orb === 'bomb') {
@@ -181,6 +183,7 @@ export function cast(state: GameState, shape: ShapeId, x: number, y: number): Ca
 
   const report: CastReport = {
     cells,
+    previousOrbs,
     treasuresGained,
     moneyGained,
     bombsHit,
