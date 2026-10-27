@@ -1,6 +1,5 @@
 /**
  * Générateur déterministe mulberry32.
- * Doit rester strictement identique à backend/app/game/rng.py.
  */
 export function nextUint32(state: number): { value: number; state: number } {
   const next = (state + 0x6d2b79f5) >>> 0;

@@ -29,20 +29,6 @@ h1 {
   margin: 0;
 }
 
-.badge {
-  font-size: 0.8rem;
-  padding: 4px 10px;
-  border-radius: 999px;
-}
-
-.badge-api {
-  background: #1f5d3a;
-}
-
-.badge-local {
-  background: #7a4a00;
-}
-
 .hud {
   width: 100%;
   display: grid;

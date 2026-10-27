@@ -8,16 +8,9 @@ Le joueur lance des sorts (ligne, croix, carré) sur une grille 8×8 de billes.
 
 ## Architecture
 
-- `backend/` : FastAPI, moteur de règles pur (`app/game/rules.py`) et routes `/api/game/new` et `/api/game/cast`. Le serveur est sans état : l'état de partie transite par le client.
-- `frontend/` : Angular. Le moteur TypeScript (`src/app/core/engine/game-engine.ts`) reprend strictement les règles du backend. Le store (`core/game/game-store.service.ts`) appelle l'API et bascule en mode local si elle est indisponible.
+- `frontend/` : Angular, entièrement autonome. Le moteur TypeScript (`src/app/core/engine/game-engine.ts`) porte les règles et le store (`core/game/game-store.service.ts`) gère l'état de partie.
 
 ## Lancement
-
-Backend (depuis `backend/`) :
-
-```powershell
-..\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8000
-```
 
 Frontend (depuis `frontend/`) :
 
@@ -26,15 +19,11 @@ npm install
 npx ng serve
 ```
 
-Le frontend tourne sur http://localhost:4200 et proxifie `/api` vers `localhost:8000`. Si l'API est arrêtée, le jeu passe en mode local (badge affiché).
+Le frontend tourne sur http://localhost:4200.
 
 ## Tests
 
 ```powershell
-# Backend
-cd backend; ..\.venv\Scripts\python.exe -m pytest
-
-# Frontend
 cd frontend; npx ng test --watch=false
 ```
 

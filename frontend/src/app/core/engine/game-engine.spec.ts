@@ -11,7 +11,7 @@ function neutralGrid(): OrbType[][] {
 }
 
 describe('createGame', () => {
-  it('reproduit la grille de référence du backend pour la graine 42', () => {
+  it('reproduit une grille de référence pour la graine 42', () => {
     const state = createGame(42);
     expect(state.grid[0]).toEqual(['neutral', 'neutral', 'gold', 'gold', 'neutral', 'neutral', 'gold', 'neutral']);
     expect(state.rng).toBe(1256095082);
@@ -23,7 +23,7 @@ describe('createGame', () => {
 });
 
 describe('levelConfig', () => {
-  it('suit les formules du backend', () => {
+  it('applique les formules de progression par niveau', () => {
     expect(levelConfig(1)).toEqual({ target: 4, maxTurns: 10, bombPercent: 8 });
     expect(levelConfig(2)).toEqual({ target: 5, maxTurns: 9, bombPercent: 11 });
     expect(levelConfig(20)).toEqual({ target: 23, maxTurns: 6, bombPercent: 30 });

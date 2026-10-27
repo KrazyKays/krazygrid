@@ -1,11 +1,6 @@
 <main class="page">
   <header class="topbar">
     <h1>Mini-roguelike</h1>
-    @if (store.mode() === 'local') {
-      <span class="badge badge-local">Mode local (API indisponible)</span>
-    } @else {
-      <span class="badge badge-api">Mode API</span>
-    }
   </header>
 
   @if (store.state(); as state) {
@@ -54,14 +49,14 @@
     <app-board
       [grid]="state.grid"
       [shape]="store.selectedShape()"
-      [disabled]="store.busy() || state.status !== 'playing'"
+      [disabled]="state.status !== 'playing'"
       (cellClick)="onCellClick($event)"
     />
 
     <p class="message" aria-live="polite">{{ store.message() }}</p>
 
     <div class="actions">
-      <button type="button" class="primary" (click)="store.newGame()" [disabled]="store.busy()">
+      <button type="button" class="primary" (click)="store.newGame()">
         Nouvelle partie
       </button>
     </div>

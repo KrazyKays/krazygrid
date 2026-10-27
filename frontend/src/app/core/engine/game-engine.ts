@@ -2,8 +2,7 @@ import { nextUint32 } from './rng';
 import { Cell, CastReport, CastResponse, GameState, OrbType, ShapeId } from '../models/game.models';
 
 /**
- * Moteur de règles en local. Doit rester identique à backend/app/game/rules.py :
- * toute modification doit être répercutée des deux côtés.
+ * Moteur de règles en local, seule source de règles du jeu.
  */
 export const GRID_WIDTH = 8;
 export const GRID_HEIGHT = 8;
