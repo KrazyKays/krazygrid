@@ -1,0 +1,310 @@
+@let r = run();
+@let f = r.floor;
+<main class="run">
+  <header class="run-top">
+    <button type="button" class="ghost small" (click)="confirmAbandon()" title="Abandonner la run">
+      ✕ Abandonner
+    </button>
+    <ol class="floor-track" aria-label="Progression des étages">
+      @for (n of floors; track n) {
+        <li
+          [class.done]="
+            n < r.def.number || (n === r.def.number && (r.phase === 'cleared' || r.phase === 'won'))
+          "
+          [class.current]="n === r.def.number"
+          [class.guardian]="n % 3 === 0"
+          [attr.title]="n % 3 === 0 ? 'Étage gardien ' + n : 'Étage ' + n"
+        >
+          {{ n % 3 === 0 ? '♛' : n }}
+        </li>
+      }
+    </ol>
+    <div class="run-badges">
+      @if (r.config.daily) {
+        <span class="badge daily">Défi du jour</span>
+      }
+      @if (r.config.ascension > 0) {
+        <span class="badge asc">Ascension {{ r.config.ascension }}</span>
+      }
+      <span class="badge shards" title="Éclats gagnés pendant cette run">✦ {{ r.shards }}</span>
+    </div>
+  </header>
+
+  <div class="run-layout">
+    <section class="hud" aria-label="État de l'étage">
+      <div class="hud-title">
+        <span class="eyebrow">{{ r.def.guardian ? 'Étage gardien' : 'Étage' }}</span>
+        <strong
+          >{{ r.def.number }}<small> / {{ floorCount }}</small></strong
+        >
+      </div>
+
+      @for (key of hurtKey(); track key) {
+        <div
+          class="stat-block hp"
+          [class.hit]="key !== 'calm'"
+          [style.--impact.ms]="store.impactDelay()"
+        >
+          <span class="eyebrow">Points de vie</span>
+          <div class="hearts" [attr.aria-label]="r.hp + ' PV sur ' + r.maxHp">
+            @for (h of hearts(); track $index) {
+              <span [class.empty]="!h.full" [class.lost]="h.lost">♥</span>
+            }
+            @if (f.shieldsLeft > 0) {
+              <span class="shield" title="Égide active"
+                >⛨{{ f.shieldsLeft > 1 ? f.shieldsLeft : '' }}</span
+              >
+            }
+          </div>
+        </div>
+      }
+
+      <div class="stat-block moves" [class.low]="f.movesLeft <= 2">
+        <span class="eyebrow">Coups restants</span>
+        <strong class="big">{{ f.movesLeft }}</strong>
+      </div>
+
+      <div class="stat-block">
+        <span class="eyebrow">Pièces</span>
+        <strong class="coins"
+          ><i class="coin-ico"></i>{{ f.coins }} <small>/ {{ f.target }}</small></strong
+        >
+        <div
+          class="bar"
+          role="progressbar"
+          [attr.aria-valuenow]="f.coins"
+          [attr.aria-valuemax]="f.target"
+        >
+          <div class="bar-fill" [style.width.%]="progress()"></div>
+        </div>
+      </div>
+
+      <div class="tools">
+        <button
+          type="button"
+          class="tool"
+          [disabled]="f.undosLeft === 0 || r.history.length === 0 || !store.canAct()"
+          (click)="store.undo()"
+          title="Annuler le dernier coup (Z)"
+        >
+          ↺ Annuler <span class="count">{{ f.undosLeft }}</span>
+        </button>
+        @if (f.hammersLeft > 0 || store.hammerMode()) {
+          <button
+            type="button"
+            class="tool"
+            [class.active]="store.hammerMode()"
+            [disabled]="!store.canAct()"
+            (click)="store.toggleHammer()"
+            title="Marteau (H)"
+          >
+            ⚒ Marteau <span class="count">{{ f.hammersLeft }}</span>
+          </button>
+        }
+        <button
+          type="button"
+          class="tool"
+          [disabled]="!store.canAct() || r.hp <= 1"
+          (click)="confirmRetry()"
+          title="Recommencer l'étage (-1 PV)"
+        >
+          ⟲ Recommencer <span class="count cost">-1♥</span>
+        </button>
+      </div>
+    </section>
+
+    <section class="stage">
+      <app-board />
+      <p class="preview" [class.danger]="previewDanger()" aria-live="polite">{{ previewText() }}</p>
+    </section>
+
+    <aside class="side">
+      <div class="panel">
+        <h3>Escouade</h3>
+        <ul class="squad">
+          @for (piece of f.board.pieces; track piece.id; let n = $index) {
+            <li>
+              <button
+                type="button"
+                class="squad-item"
+                [class.selected]="store.selectedId() === piece.id"
+                [disabled]="!store.canAct()"
+                (click)="store.select(piece.id)"
+              >
+                <app-shape-glyph [kind]="piece.kind" />
+                <span class="squad-text">
+                  <strong
+                    >{{ shapes[piece.kind].name }} <kbd>{{ n + 1 }}</kbd></strong
+                  >
+                  <small>{{ shapes[piece.kind].rule }}</small>
+                </span>
+              </button>
+            </li>
+          }
+        </ul>
+        @if (r.roster.length > f.board.pieces.length) {
+          <p class="muted small">
+            Nouvelle recrue en route : elle rejoint l’escouade au prochain étage.
+          </p>
+        }
+      </div>
+
+      <div class="panel">
+        <h3>Avantages</h3>
+        @if (ownedPerks().length === 0) {
+          <p class="muted small">Ouvrez des coffres ▣ pour obtenir des avantages.</p>
+        } @else {
+          <ul class="perk-chips">
+            @for (perk of ownedPerks(); track perk.def.id) {
+              <li [class]="'chip rarity-' + perk.def.rarity" [attr.title]="perk.def.description">
+                <span class="chip-icon">{{ perk.def.icon }}</span>
+                {{ perk.def.name }}
+                @if (perk.count > 1) {
+                  <b>×{{ perk.count }}</b>
+                }
+              </li>
+            }
+          </ul>
+        }
+      </div>
+
+      <details class="panel legend">
+        <summary>Légende</summary>
+        <ul>
+          <li><i class="lg lg-coin"></i> Pièce : +1</li>
+          <li><i class="lg lg-gem"></i> Gemme : +3</li>
+          <li><i class="lg lg-chest"></i> Coffre : choix d’un avantage</li>
+          <li><i class="lg lg-heart"></i> Cœur : +1 PV</li>
+          <li><i class="lg lg-wall"></i> Mur : bloque tout sauf les sauts</li>
+          <li><i class="lg lg-crack"></i> Bloc fragile : se brise quand on le percute</li>
+          <li><i class="lg lg-spike"></i> Pics : -1 PV au passage</li>
+          <li>
+            <i class="lg lg-sentinel"></i> Sentinelle : avance après chaque coup, blesse au contact
+          </li>
+        </ul>
+        <p class="muted small">
+          L’étage se termine dès que l’objectif est atteint : prenez le coffre avant !
+        </p>
+      </details>
+    </aside>
+  </div>
+
+  @for (key of hurtKey(); track key) {
+    @if (key !== 'calm') {
+      <div
+        class="hurt-vignette"
+        aria-hidden="true"
+        [style.animation-delay.ms]="store.impactDelay()"
+      ></div>
+    }
+  }
+
+  @if (showLoot()) {
+    <div class="overlay" role="dialog" aria-modal="true" aria-labelledby="loot-title">
+      <div class="modal loot">
+        <p class="eyebrow">{{ r.def.guardian ? 'Coffre du gardien' : 'Coffre ouvert' }}</p>
+        <h2 id="loot-title">Choisissez un avantage</h2>
+        <div class="loot-cards">
+          @for (card of lootCards(); track card.id; let n = $index) {
+            <button
+              type="button"
+              [class]="'loot-card rarity-' + card.rarity"
+              (click)="store.choose(card.id)"
+            >
+              <span class="loot-rarity">{{ rarityLabels[card.rarity] }}</span>
+              @if (card.shape) {
+                <span class="loot-icon"><app-shape-glyph [kind]="card.shape" /></span>
+              } @else {
+                <span class="loot-icon">{{ card.icon }}</span>
+              }
+              <strong>{{ card.name }}</strong>
+              <span class="loot-desc">{{ card.description }}</span>
+              <kbd>{{ n + 1 }}</kbd>
+            </button>
+          }
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="ghost" [disabled]="r.rerolls <= 0" (click)="store.reroll()">
+            ⚄ Relancer ({{ r.rerolls }})
+          </button>
+          <button type="button" class="ghost" (click)="store.skipLoot()">
+            Ignorer (+{{ skipShards }} ✦)
+          </button>
+        </div>
+      </div>
+    </div>
+  } @else if (r.phase === 'cleared' && r.summary; as s) {
+    <div class="overlay" role="dialog" aria-modal="true" aria-labelledby="cleared-title">
+      <div class="modal">
+        <p class="eyebrow good">Objectif atteint</p>
+        <h2 id="cleared-title">Étage {{ s.floor }} terminé</h2>
+        <dl class="summary">
+          <dt>Coups non utilisés</dt>
+          <dd>{{ s.movesLeft }}</dd>
+          <dt>Pièces en surplus</dt>
+          <dd>{{ s.overshoot }}</dd>
+          @if (multiplier() > 1) {
+            <dt>Multiplicateur d’ascension</dt>
+            <dd>×{{ multiplier() }}</dd>
+          }
+          <dt>Éclats gagnés</dt>
+          <dd class="shards-value">+{{ s.shards }} ✦</dd>
+        </dl>
+        @if (r.def.number + 1 === 3 || r.def.number + 1 === 6 || r.def.number + 1 === 9) {
+          <p class="warn-note">
+            ♛ Prochain étage : gardien. Moins de marge, plus de sentinelles, coffre rare.
+          </p>
+        }
+        <button type="button" class="primary" (click)="store.next()">
+          Étage suivant <kbd>Entrée</kbd>
+        </button>
+      </div>
+    </div>
+  } @else if (r.phase === 'failed') {
+    <div class="overlay" role="dialog" aria-modal="true" aria-labelledby="failed-title">
+      <div class="modal">
+        <p class="eyebrow bad">Plus de coups</p>
+        <h2 id="failed-title">Objectif manqué : -1 PV</h2>
+        <p class="muted">
+          Il vous manquait {{ f.target - f.coins }} pièce(s). L’étage est identique à chaque
+          tentative : trouvez le bon chemin.
+        </p>
+        <div class="modal-actions">
+          @if (f.undosLeft > 0 && r.history.length > 0) {
+            <button type="button" class="ghost" (click)="store.undo()">
+              ↺ Annuler le dernier coup (rend le PV)
+            </button>
+          }
+          <button type="button" class="primary" (click)="store.retry()">
+            Réessayer l’étage <kbd>Entrée</kbd>
+          </button>
+        </div>
+      </div>
+    </div>
+  } @else if (r.phase === 'dead' || r.phase === 'won') {
+    <div class="overlay" role="dialog" aria-modal="true" aria-labelledby="end-title">
+      <div class="modal end" [class.victory]="r.phase === 'won'">
+        <p class="eyebrow" [class.good]="r.phase === 'won'" [class.bad]="r.phase === 'dead'">
+          {{ r.phase === 'won' ? 'Victoire' : 'Fin de la run' }}
+        </p>
+        <h2 id="end-title">
+          {{ r.phase === 'won' ? 'La grille est vaincue !' : 'Votre escouade est tombée' }}
+        </h2>
+        <dl class="summary">
+          <dt>Étages terminés</dt>
+          <dd>{{ r.floorsCleared }} / {{ floorCount }}</dd>
+          <dt>Score</dt>
+          <dd>{{ r.score }}</dd>
+          <dt>Avantages</dt>
+          <dd>{{ r.perks.length }}</dd>
+          <dt>Éclats rapportés à l’Atelier</dt>
+          <dd class="shards-value">+{{ r.shards }} ✦</dd>
+        </dl>
+        @if (r.phase === 'won' && !r.config.daily) {
+          <p class="good-note">Nouvelle ascension débloquée si c’était votre plus haut niveau.</p>
+        }
+        <button type="button" class="primary" (click)="store.quit()">Retour à l’Atelier</button>
+      </div>
+    </div>
+  }
+</main>

@@ -1,0 +1,163 @@
+@let m = meta.state();
+<main class="hub">
+  <header class="hub-hero">
+    <div class="logo-shapes" aria-hidden="true">
+      @for (kind of logoShapes; track kind) {
+        <app-shape-glyph [kind]="kind" />
+      }
+    </div>
+    <h1>Krazy<span>Grid</span></h1>
+    <p class="tagline">Un roguelite de formes géométriques, de pièces et de casse-têtes.</p>
+    <div class="hero-actions">
+      <span class="wallet" title="Éclats à dépenser dans l'Atelier">✦ {{ m.shards }} <small>éclats</small></span>
+      <button type="button" class="ghost small" (click)="showHelp.set(true)">Comment jouer ?</button>
+    </div>
+  </header>
+
+  <div class="hub-grid">
+    <section class="panel play-card">
+      <h2>Nouvelle run</h2>
+      <p class="muted">9 étages, 3 gardiens. Les étages se rejouent à l’identique : chaque échec coûte 1 PV.</p>
+      <div class="asc-picker" role="radiogroup" aria-label="Niveau d'ascension">
+        @for (level of ascensions(); track level) {
+          <button
+            type="button"
+            role="radio"
+            class="asc"
+            [class.active]="ascension() === level"
+            [attr.aria-checked]="ascension() === level"
+            (click)="ascension.set(level)"
+          >
+            {{ level === 0 ? 'Normal' : 'A' + level }}
+          </button>
+        }
+        @for (level of lockedAscensions(); track level) {
+          <span class="asc locked" title="Gagnez une run au niveau précédent pour débloquer">🔒</span>
+        }
+      </div>
+      <ul class="asc-rules">
+        @for (rule of rules.slice(1, ascension() + 1); track $index) {
+          <li>A{{ $index + 1 }} · {{ rule }}</li>
+        } @empty {
+          <li>{{ rules[0] }} Gagnez une run pour débloquer l’Ascension 1.</li>
+        }
+        @if (ascension() > 0) {
+          <li class="good">Éclats ×{{ 1 + 0.25 * ascension() }}</li>
+        }
+      </ul>
+      <button type="button" class="primary big" (click)="play()">Lancer la run</button>
+    </section>
+
+    <section class="panel daily-card">
+      <h2>Défi du jour</h2>
+      <p class="muted">Même graine pour tout le monde aujourd’hui, sans les bonus de l’Atelier.</p>
+      @if (dailyToday(); as d) {
+        <p class="daily-record">
+          Meilleur : <strong>{{ d.floors }}</strong> étage(s) · score <strong>{{ d.score }}</strong>
+          <small>({{ d.attempts }} tentative{{ d.attempts > 1 ? 's' : '' }})</small>
+        </p>
+      } @else {
+        <p class="daily-record muted">Pas encore tenté aujourd’hui.</p>
+      }
+      <button type="button" class="secondary" (click)="daily()">Relever le défi</button>
+    </section>
+
+    <section class="panel stats-card">
+      <h2>Archives</h2>
+      <dl class="stats">
+        <div><dt>Runs</dt><dd>{{ m.stats.runs }}</dd></div>
+        <div><dt>Victoires</dt><dd>{{ m.stats.wins }}</dd></div>
+        <div><dt>Record d’étages</dt><dd>{{ m.stats.bestFloor }}</dd></div>
+        <div><dt>Meilleur score</dt><dd>{{ m.stats.bestScore }}</dd></div>
+        <div><dt>Éclats cumulés</dt><dd>{{ m.stats.totalShards }}</dd></div>
+        <div><dt>Ascension max</dt><dd>{{ m.ascensionUnlocked }}</dd></div>
+      </dl>
+      <div class="bestiary">
+        @for (kind of shapeKinds; track kind) {
+          <span class="bestiary-item" [class.locked]="!unlockedShapes().has(kind)" [attr.title]="shapes[kind].name + ' : ' + shapes[kind].rule">
+            <app-shape-glyph [kind]="kind" />
+          </span>
+        }
+      </div>
+    </section>
+
+    <section class="panel workshop">
+      <div class="workshop-head">
+        <h2>Atelier</h2>
+        <span class="wallet">✦ {{ m.shards }}</span>
+      </div>
+      <p class="muted">Dépensez vos éclats en améliorations permanentes.</p>
+      <ul class="upgrades">
+        @for (up of upgrades; track up.id) {
+          @let lvl = level(up);
+          @let price = cost(up);
+          <li class="upgrade" [class.maxed]="price === null" [class.locked]="locked(up)">
+            <span class="up-icon">{{ up.icon }}</span>
+            <div class="up-body">
+              <strong>{{ up.name }}</strong>
+              <small>{{ up.description }}</small>
+              @if (up.costs.length > 1) {
+                <span class="pips" [attr.aria-label]="'Niveau ' + lvl + ' sur ' + up.costs.length">
+                  @for (c of up.costs; track $index) {
+                    <i [class.on]="$index < lvl"></i>
+                  }
+                </span>
+              }
+            </div>
+            @if (price === null) {
+              <span class="up-done">✓</span>
+            } @else if (locked(up)) {
+              <span class="up-lock" [attr.title]="'Requiert ' + requirementName(up)">🔒</span>
+            } @else {
+              <button type="button" class="buy" [disabled]="!affordable(up)" (click)="meta.buy(up.id)">✦ {{ price }}</button>
+            }
+          </li>
+        }
+      </ul>
+      <button type="button" class="link danger" (click)="resetProgress()">Réinitialiser la progression</button>
+    </section>
+  </div>
+
+  @if (showHelp()) {
+    <div class="overlay" role="dialog" aria-modal="true" aria-labelledby="help-title">
+      <div class="modal help">
+        <h2 id="help-title">Comment jouer</h2>
+        <ol class="help-steps">
+          <li>
+            <strong>Atteignez l’objectif de pièces</strong> avant d’épuiser vos coups. Chaque forme ramasse ce qu’elle
+            traverse.
+          </li>
+          <li>
+            <strong>Chaque forme bouge à sa façon.</strong>
+            <ul class="help-shapes">
+              @for (kind of shapeKinds; track kind) {
+                <li [class.locked]="!unlockedShapes().has(kind)">
+                  <app-shape-glyph [kind]="kind" />
+                  <span><b>{{ shapes[kind].name }}</b> — {{ shapes[kind].rule }}</span>
+                </li>
+              }
+            </ul>
+          </li>
+          <li>
+            <strong>Les formes se servent d’appui :</strong> une forme qui glisse s’arrête contre les murs, les blocs
+            fragiles, les autres formes et les sentinelles.
+          </li>
+          <li>
+            <strong>Évitez les pics et les sentinelles.</strong> Les sentinelles avancent d’une case après chacun de vos
+            coups ; la case rouge montre où elles vont.
+          </li>
+          <li>
+            <strong>Ouvrez les coffres</strong> pour choisir 1 avantage parmi 3. L’étage se termine dès que l’objectif
+            est atteint : passez par le coffre avant !
+          </li>
+          <li>
+            <strong>Plus de coups ?</strong> -1 PV, et vous retentez le même étage. À 0 PV, la run s’arrête — mais les
+            éclats gagnés financent l’Atelier.
+          </li>
+        </ol>
+        <p class="muted small">Raccourcis : 1-5 sélectionner · Tab forme suivante · Z annuler · H marteau · Entrée continuer</p>
+        <button type="button" class="primary" (click)="closeHelp()">C’est parti</button>
+      </div>
+    </div>
+  }
+</main>

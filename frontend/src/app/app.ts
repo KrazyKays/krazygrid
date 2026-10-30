@@ -1,10 +1,20 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
-import { GamePageComponent } from './features/game/game-page/game-page.component';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { RunStore } from './core/game/run-store.service';
+import { HubPageComponent } from './features/hub/hub-page.component';
+import { RunPageComponent } from './features/run/run-page.component';
 
 @Component({
   selector: 'app-root',
-  imports: [GamePageComponent],
-  template: '<app-game-page />',
+  imports: [HubPageComponent, RunPageComponent],
+  template: `
+    @if (runs.run()) {
+      <app-run-page />
+    } @else {
+      <app-hub-page />
+    }
+  `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class App {}
+export class App {
+  protected readonly runs = inject(RunStore);
+}

@@ -1,0 +1,107 @@
+@let b = board();
+<div
+  #boardEl
+  class="board"
+  role="grid"
+  aria-label="Plateau"
+  [class.hammering]="store.hammerMode()"
+  [style.--cols]="b.width"
+  [style.--rows]="b.height"
+  (mouseleave)="store.hovered.set(null)"
+>
+  @for (cell of cells(); track cell.i) {
+    <button
+      type="button"
+      [class]="'cell tile-' + cell.tile"
+      [class.dest]="destinations().has(cell.i)"
+      [class.dest-break]="
+        destinations().get(cell.i)?.breaks && !destinations().get(cell.i)?.path?.length
+      "
+      [class.on-path]="pathKeys().has(cell.i)"
+      [class.danger]="dangerKeys().has(cell.i)"
+      [class.hurt]="hurtKeys().has(cell.i)"
+      [class.hammer-target]="hammerTarget(cell)"
+      [class.alt]="(cell.x + cell.y) % 2 === 1"
+      [attr.aria-label]="label(cell)"
+      (mouseenter)="store.hovered.set(cell)"
+      (focus)="store.hovered.set(cell)"
+      (click)="store.clickCell(cell)"
+    >
+      @if (cell.tile === 'spike') {
+        <svg class="spikes" viewBox="0 0 100 100" aria-hidden="true">
+          <path d="M14 78 L28 40 L42 78 Z M42 78 L56 30 L70 78 Z M62 78 L76 46 L90 78 Z" />
+        </svg>
+      }
+      @if (cell.item) {
+        <span [class]="'item item-' + cell.item" aria-hidden="true">
+          @switch (cell.item) {
+            @case ('coin') {
+              <i></i>
+            }
+            @case ('gem') {
+              <svg viewBox="0 0 100 100">
+                <polygon points="50,10 84,38 50,92 16,38" />
+                <polyline points="16,38 84,38" />
+              </svg>
+            }
+            @case ('chest') {
+              <svg viewBox="0 0 100 100">
+                <rect x="14" y="34" width="72" height="50" rx="6" />
+                <path d="M14 50 H86 M50 44 V60" />
+                <path d="M18 34 Q50 8 82 34" />
+              </svg>
+            }
+            @case ('heart') {
+              <svg viewBox="0 0 100 100">
+                <path d="M50 86 L16 50 A18 18 0 0 1 50 24 A18 18 0 0 1 84 50 Z" />
+              </svg>
+            }
+          }
+        </span>
+      }
+      @if (destinations().has(cell.i)) {
+        <span class="dest-dot" aria-hidden="true"></span>
+      }
+    </button>
+  }
+
+  <div class="units" aria-hidden="true">
+    @for (sentinel of b.sentinels; track sentinel.id) {
+      <div class="sentinel" [style]="sentinelStyle(sentinel)">
+        <div class="sentinel-body">
+          <svg viewBox="0 0 100 100">
+            <polygon points="50,8 92,50 50,92 8,50" />
+            <circle cx="50" cy="50" r="12" />
+          </svg>
+          <span class="sentinel-arrow" [style.rotate.deg]="arrow(sentinel.dx, sentinel.dy)">▶</span>
+        </div>
+      </div>
+    }
+    @for (piece of b.pieces; track piece.id; let n = $index) {
+      <div
+        [class]="'unit shape-' + piece.kind"
+        [class.selected]="selected() === piece.id"
+        [class.hurt]="hurtPieces().has(piece.id)"
+        [style]="pieceStyle(piece.id, piece)"
+      >
+        <span class="unit-plate"></span>
+        <app-shape-glyph [kind]="piece.kind" />
+        <span class="unit-key">{{ n + 1 }}</span>
+      </div>
+    }
+    @for (flash of damageFlash(); track flash) {
+      <div class="damage-flash" [style.animation-delay.ms]="store.impactDelay()"></div>
+    }
+    @for (float of floats(); track store.tick() + '-' + $index) {
+      <div
+        [class]="'float float-' + float.tone"
+        [style]="pos(float)"
+        [style.animation-delay.ms]="
+          float.tone === 'hurt' || float.tone === 'shield' ? store.impactDelay() : 120
+        "
+      >
+        <span>{{ float.text }}</span>
+      </div>
+    }
+  </div>
+</div>
