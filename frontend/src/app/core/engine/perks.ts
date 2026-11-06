@@ -1,5 +1,5 @@
 import { Rng } from './rng';
-import { ShapeKind } from './types';
+import { GuardianRule, ShapeKind } from './types';
 
 export type PerkId =
   | 'hourglass'
@@ -102,8 +102,8 @@ export const PERKS: Record<PerkId, PerkDef> = {
   },
   greed: {
     id: 'greed',
-    name: 'Avarice',
-    description: '+3 éclats à chaque étage terminé.',
+    name: 'Opportunisme',
+    description: '+1 pièce pour chaque coup qui ne ramasse rien.',
     rarity: 'common',
     icon: '✦',
     stackable: true,
@@ -193,7 +193,10 @@ export interface Mods {
   hammers: number;
   shields: number;
   gemBonus: number;
-  greed: number;
+  /** Pièces gagnées par un coup qui ne ramasse rien (Opportunisme). */
+  idleCoins: number;
+  /** Nombre de pas des sentinelles après chaque coup. */
+  sentinelSteps: number;
   boots: boolean;
   momentum: boolean;
   carapace: boolean;
@@ -207,7 +210,8 @@ export const NO_MODS: Mods = {
   hammers: 0,
   shields: 0,
   gemBonus: 0,
-  greed: 0,
+  idleCoins: 0,
+  sentinelSteps: 1,
   boots: false,
   momentum: false,
   carapace: false,
@@ -221,15 +225,24 @@ export interface BaseBonuses {
   hammers: number;
 }
 
-export function computeMods(perks: readonly PerkId[], base: BaseBonuses): Mods {
+/** Annulations offertes à chaque étage, avant tout bonus. */
+export const BASE_UNDOS = 1;
+
+/** Effets des règles de gardien qui passent par les modificateurs. */
+export function ruleMods(rule: GuardianRule | null): Pick<Mods, 'gemBonus' | 'sentinelSteps'> {
+  return { gemBonus: rule === 'treasure' ? 3 : 0, sentinelSteps: rule === 'frenzy' ? 2 : 1 };
+}
+
+export function computeMods(perks: readonly PerkId[], base: BaseBonuses, rule: GuardianRule | null = null): Mods {
   const count = (id: PerkId) => perks.filter((perk) => perk === id).length;
   return {
     extraMoves: base.moves + count('hourglass') + 3 * count('glassCannon'),
-    undos: base.undos + count('rewind'),
+    undos: BASE_UNDOS + base.undos + count('rewind'),
     hammers: base.hammers + count('hammer'),
     shields: count('aegis'),
-    gemBonus: 2 * count('jeweler'),
-    greed: 3 * count('greed'),
+    gemBonus: 2 * count('jeweler') + ruleMods(rule).gemBonus,
+    idleCoins: count('greed'),
+    sentinelSteps: ruleMods(rule).sentinelSteps,
     boots: perks.includes('boots'),
     momentum: perks.includes('momentum'),
     carapace: perks.includes('carapace'),

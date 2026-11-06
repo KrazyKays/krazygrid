@@ -1,13 +1,37 @@
-import { allLegalMoves, applyMove, cloneBoard, index, occupant } from './board';
-import { NO_MODS } from './perks';
+import { allLegalMoves, applyMove, cloneBoard, index, itemValue, occupant } from './board';
+import { Mods, NO_MODS, ruleMods } from './perks';
 import { mixSeed, Rng } from './rng';
-import { Board, Cell, FloorDef, FloorState, ShapeKind, Tile } from './types';
+import { Board, Cell, FloorDef, FloorState, GuardianRule, ShapeKind, Tile } from './types';
 
 export const FLOOR_COUNT = 9;
 const MAX_ATTEMPTS = 400;
 
 export function isGuardianFloor(floor: number): boolean {
   return floor % 3 === 0;
+}
+
+export interface GuardianRuleDef {
+  id: GuardianRule;
+  name: string;
+  description: string;
+  icon: string;
+}
+
+export const GUARDIAN_RULES: Record<GuardianRule, GuardianRuleDef> = {
+  frenzy: { id: 'frenzy', name: 'Frénésie', description: 'Les sentinelles avancent de 2 cases après chaque coup.', icon: '⚡' },
+  treasure: { id: 'treasure', name: 'Trésor', description: 'Les gemmes valent double, l’objectif aussi.', icon: '◆' },
+  blackout: { id: 'blackout', name: 'Brouillard', description: 'La prochaine position des sentinelles n’est plus annoncée.', icon: '☁' },
+  swarm: { id: 'swarm', name: 'Essaim', description: 'Une sentinelle supplémentaire patrouille.', icon: '✷' },
+  thorns: { id: 'thorns', name: 'Ronces', description: 'Le sol est couvert de pics.', icon: '^' },
+};
+
+/** Règle du gardien d'un étage : connue à l'avance pour pouvoir l'annoncer. */
+export function guardianRule(runSeed: number, floor: number): GuardianRule | null {
+  if (!isGuardianFloor(floor)) {
+    return null;
+  }
+  const ids = Object.keys(GUARDIAN_RULES) as GuardianRule[];
+  return new Rng(mixSeed(runSeed ^ 0x9e3779b9, floor)).pick(ids);
 }
 
 export interface FloorParams {
@@ -23,12 +47,13 @@ export interface FloorParams {
   minCells: number;
 }
 
-export function floorParams(floor: number, ascension: number): FloorParams {
+export function floorParams(floor: number, ascension: number, rule: GuardianRule | null = null): FloorParams {
   const guardian = isGuardianFloor(floor);
   const size = floor <= 3 ? 6 : floor <= 6 ? 7 : 8;
   const area = size * size;
   let sentinels = floor <= 2 ? 0 : floor <= 5 ? 1 : floor <= 8 ? 2 : 3;
   if (guardian) sentinels++;
+  if (rule === 'swarm') sentinels++;
   if (ascension >= 3 && floor >= 2) sentinels++;
   let spareMoves = floor <= 2 ? 2 : floor <= 5 ? 1 : 0;
   if (guardian) spareMoves = 0;
@@ -36,7 +61,7 @@ export function floorParams(floor: number, ascension: number): FloorParams {
   let slack = floor <= 2 ? 0.3 : floor <= 5 ? 0.2 : 0.1;
   if (guardian) slack = 0.05;
   if (ascension >= 4) slack /= 2;
-  const spikeRate = 0.05 + 0.01 * floor + (ascension >= 2 ? 0.04 : 0);
+  const spikeRate = 0.05 + 0.01 * floor + (ascension >= 2 ? 0.04 : 0) + (rule === 'thorns' ? 0.1 : 0);
   return {
     size,
     walls: Math.round(area * 0.12),
@@ -63,10 +88,12 @@ interface Attempt {
 export function generateFloor(runSeed: number, floor: number, roster: readonly ShapeKind[], ascension: number): FloorDef {
   const seed = mixSeed(runSeed, floor);
   const rng = new Rng(seed);
-  const params = floorParams(floor, ascension);
+  const rule = guardianRule(runSeed, floor);
+  const params = floorParams(floor, ascension, rule);
+  const mods: Mods = { ...NO_MODS, ...ruleMods(rule) };
   let best: Attempt | null = null;
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    const candidate = tryLayout(rng, params, roster);
+    const candidate = tryLayout(rng, params, roster, mods);
     if (candidate && (!best || candidate.visited.length > best.visited.length)) {
       best = candidate;
     }
@@ -77,10 +104,10 @@ export function generateFloor(runSeed: number, floor: number, roster: readonly S
   if (!best) {
     throw new Error(`Impossible de générer l'étage ${floor}.`);
   }
-  return decorate(rng, best, params, floor, seed);
+  return decorate(rng, best, params, floor, seed, rule, mods);
 }
 
-function tryLayout(rng: Rng, params: FloorParams, roster: readonly ShapeKind[]): Attempt | null {
+function tryLayout(rng: Rng, params: FloorParams, roster: readonly ShapeKind[], mods: Mods): Attempt | null {
   const { size } = params;
   const board: Board = {
     width: size,
@@ -124,11 +151,13 @@ function tryLayout(rng: Rng, params: FloorParams, roster: readonly ShapeKind[]):
   const solution: Attempt['solution'] = [];
   for (let step = 0; step < params.solutionLength; step++) {
     const scored = allLegalMoves(floor.board)
-      .map((option) => ({ option, result: applyMove(floor, option, NO_MODS) }))
+      .map((option) => ({ option, result: applyMove(floor, option, mods) }))
       .filter(({ result }) => result.damage === 0)
       .map((entry) => ({
         ...entry,
-        fresh: entry.option.path.filter((cell) => !seen.has(index(board, cell.x, cell.y))),
+        fresh: [...entry.option.path, ...entry.option.sweep].filter(
+          (cell) => !seen.has(index(board, cell.x, cell.y)),
+        ),
       }));
     if (scored.length === 0) {
       return null;
@@ -148,13 +177,21 @@ function tryLayout(rng: Rng, params: FloorParams, roster: readonly ShapeKind[]):
   return { board, visited, solution };
 }
 
-function decorate(rng: Rng, attempt: Attempt, params: FloorParams, floor: number, seed: number): FloorDef {
+function decorate(
+  rng: Rng,
+  attempt: Attempt,
+  params: FloorParams,
+  floor: number,
+  seed: number,
+  rule: GuardianRule | null,
+  mods: Mods,
+): FloorDef {
   const board = cloneBoard(attempt.board);
   const guardian = isGuardianFloor(floor);
   const path = attempt.visited;
 
-  // Le coffre se trouve sur la première moitié du parcours : atteignable avant l'objectif.
-  const chestAt = path.length > 2 ? 1 + rng.int(Math.max(1, Math.floor(path.length / 2))) : -1;
+  // Le coffre est sur le parcours, mais jamais sur les 2 premières cases : il faut faire le détour.
+  const chestAt = path.length > 3 ? 2 + rng.int(Math.max(1, Math.ceil((path.length * 2) / 3) - 2)) : -1;
   let value = 0;
   path.forEach((cell, i) => {
     const at = index(board, cell.x, cell.y);
@@ -162,7 +199,7 @@ function decorate(rng: Rng, attempt: Attempt, params: FloorParams, floor: number
       board.items[at] = 'chest';
     } else if (rng.chance(0.14 + floor * 0.01)) {
       board.items[at] = 'gem';
-      value += 3;
+      value += itemValue('gem', mods);
     } else if (rng.chance(0.8)) {
       board.items[at] = 'coin';
       value++;
@@ -196,16 +233,55 @@ function decorate(rng: Rng, attempt: Attempt, params: FloorParams, floor: number
     board.items[free.pop()!] = 'heart';
   }
 
-  const target = Math.max(1, value - Math.floor(value * params.slack));
+  // Calibrage : si un joueur glouton fait bien mieux que le parcours semé, l'objectif monte d'autant.
+  let target = Math.max(1, value - Math.floor(value * params.slack));
+  let solution = attempt.solution;
+  const greedy = greedyLine(board, attempt.solution.length, mods);
+  const greedyTarget = greedy.coins - Math.floor(greedy.coins * params.slack);
+  if (greedyTarget > target) {
+    target = greedyTarget;
+    solution = greedy.solution;
+  }
   return {
     number: floor,
     seed,
     guardian,
+    rule,
     board,
     target,
     baseMoves: attempt.solution.length + params.spareMoves,
-    solution: attempt.solution,
+    solution,
   };
+}
+
+/** Joue à chaque coup celui qui rapporte le plus sans blesser. */
+function greedyLine(board: Board, moves: number, mods: Mods): { coins: number; solution: Attempt['solution'] } {
+  let floor: FloorState = {
+    board: cloneBoard(board),
+    coins: 0,
+    target: Number.MAX_SAFE_INTEGER,
+    movesLeft: moves,
+    turn: 0,
+    shieldsLeft: 0,
+    hammersLeft: 0,
+    undosLeft: 0,
+  };
+  const solution: Attempt['solution'] = [];
+  for (let step = 0; step < moves; step++) {
+    let best: { option: ReturnType<typeof allLegalMoves>[number]; result: ReturnType<typeof applyMove> } | null = null;
+    for (const option of allLegalMoves(floor.board)) {
+      const result = applyMove(floor, option, mods);
+      if (result.damage === 0 && (!best || result.coinsGained > best.result.coinsGained)) {
+        best = { option, result };
+      }
+    }
+    if (!best) {
+      break;
+    }
+    solution.push({ pieceId: best.option.pieceId, target: best.option.target });
+    floor = best.result.floor;
+  }
+  return { coins: floor.coins, solution };
 }
 
 function xy(cell: Cell): [number, number] {

@@ -1482,3 +1482,82 @@ app-board {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Étoiles, sortie d'étage et règles de gardien */
+.floor-track {
+  padding-bottom: 10px;
+}
+.floor-track li {
+  position: relative;
+}
+.track-stars {
+  position: absolute;
+  top: calc(100% + 1px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.5rem;
+  letter-spacing: -1px;
+  color: var(--gold);
+  white-space: nowrap;
+}
+.guardian-rule {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--warn) 50%, var(--line));
+  background: color-mix(in srgb, var(--warn) 12%, var(--surface));
+}
+.guardian-rule .guardian-icon {
+  font-size: 1.3rem;
+  color: var(--warn);
+}
+.guardian-rule strong {
+  display: block;
+  color: var(--warn);
+}
+.guardian-rule small {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+.star-goals {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  display: grid;
+  gap: 2px;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.star-goals li.done {
+  color: var(--gold);
+}
+.exit-btn {
+  width: 100%;
+  animation: exit-pulse 1.6s ease-in-out infinite;
+}
+@keyframes exit-pulse {
+  50% {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--good) 35%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .exit-btn {
+    animation: none;
+  }
+}
+.summary-stars {
+  margin: 0;
+  font-size: 2rem;
+  letter-spacing: 4px;
+  color: var(--gold);
+}
+.summary-stars.small {
+  font-size: 0.85rem;
+  letter-spacing: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+}

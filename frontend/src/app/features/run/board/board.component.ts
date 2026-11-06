@@ -8,8 +8,8 @@ import {
   untracked,
   viewChild,
 } from '@angular/core';
-import { index, inBounds, itemValue, SHAPES } from '../../../core/engine/board';
-import { Board, Cell, Item, Tile } from '../../../core/engine/types';
+import { index, itemValue, sentinelForecast, SHAPES } from '../../../core/engine/board';
+import { Cell, Item, Tile } from '../../../core/engine/types';
 import { RunStore } from '../../../core/game/run-store.service';
 import { ShapeGlyphComponent } from '../../../shared/shape-glyph.component';
 
@@ -68,19 +68,17 @@ export class BoardComponent {
     const board = this.board();
     const option = this.store.hoveredOption();
     const keys = new Set<number>();
-    option?.path.forEach((cell) => keys.add(index(board, cell.x, cell.y)));
+    [...(option?.path ?? []), ...(option?.sweep ?? [])].forEach((cell) => keys.add(index(board, cell.x, cell.y)));
     return keys;
   });
 
-  /** Case où chaque sentinelle se rendra au prochain tour. */
+  /** Cases où les sentinelles se rendront au prochain tour (aucune sous le Brouillard). */
   protected readonly dangerKeys = computed(() => {
     const board = this.board();
-    const keys = new Set<number>();
-    for (const sentinel of board.sentinels) {
-      const next = nextSentinelCell(board, sentinel.x, sentinel.y, sentinel.dx, sentinel.dy);
-      if (next) keys.add(index(board, next.x, next.y));
-    }
-    return keys;
+    const run = this.store.run()!;
+    if (run.def.rule === 'blackout') return new Set<number>();
+    const steps = this.store.mods()?.sentinelSteps ?? 1;
+    return new Set(sentinelForecast(board, steps).map((cell) => index(board, cell.x, cell.y)));
   });
 
   protected readonly hurtKeys = computed(() => {
@@ -210,20 +208,4 @@ export class BoardComponent {
   protected hammerTarget(cell: CellView): boolean {
     return this.store.hammerMode() && (cell.tile === 'wall' || cell.tile === 'crack');
   }
-}
-
-function nextSentinelCell(board: Board, x: number, y: number, dx: number, dy: number): Cell | null {
-  for (const [sx, sy] of [
-    [dx, dy],
-    [-dx, -dy],
-  ]) {
-    const nx = x + sx;
-    const ny = y + sy;
-    if (!inBounds(board, nx, ny)) continue;
-    const tile = board.tiles[index(board, nx, ny)];
-    if (tile === 'wall' || tile === 'crack') continue;
-    if (board.sentinels.some((other) => other.x === nx && other.y === ny)) continue;
-    return { x: nx, y: ny };
-  }
-  return null;
 }

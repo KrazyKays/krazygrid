@@ -17,7 +17,7 @@
   <div class="hub-grid">
     <section class="panel play-card">
       <h2>Nouvelle run</h2>
-      <p class="muted">9 étages, 3 gardiens. Les étages se rejouent à l’identique : chaque échec coûte 1 PV.</p>
+      <p class="muted">9 étages, 3 gardiens à règle spéciale. Les étages se rejouent à l’identique : le premier échec est gratuit, les suivants coûtent 1 PV.</p>
       <div class="asc-picker" role="radiogroup" aria-label="Niveau d'ascension">
         @for (level of ascensions(); track level) {
           <button
@@ -125,7 +125,7 @@
         <ol class="help-steps">
           <li>
             <strong>Atteignez l’objectif de pièces</strong> avant d’épuiser vos coups. Chaque forme ramasse ce qu’elle
-            traverse.
+            traverse. Ensuite, sortez quand vous voulez : du surplus et des coups en réserve rapportent des étoiles ★.
           </li>
           <li>
             <strong>Chaque forme bouge à sa façon.</strong>
@@ -147,15 +147,15 @@
             coups ; la case rouge montre où elles vont.
           </li>
           <li>
-            <strong>Ouvrez les coffres</strong> pour choisir 1 avantage parmi 3. L’étage se termine dès que l’objectif
-            est atteint : passez par le coffre avant !
+            <strong>Ouvrez les coffres</strong> pour choisir 1 avantage parmi 3. Un coffre oublié est récupéré à la
+            sortie, mais avec seulement 2 choix.
           </li>
           <li>
-            <strong>Plus de coups ?</strong> -1 PV, et vous retentez le même étage. À 0 PV, la run s’arrête — mais les
-            éclats gagnés financent l’Atelier.
+            <strong>Plus de coups ?</strong> Vous retentez le même étage : le premier échec est gratuit, les suivants
+            coûtent 1 PV. À 0 PV, la run s’arrête — mais les éclats gagnés financent l’Atelier.
           </li>
         </ol>
-        <p class="muted small">Raccourcis : 1-5 sélectionner · Tab forme suivante · Z annuler · H marteau · Entrée continuer</p>
+        <p class="muted small">Raccourcis : 1-5 sélectionner · Tab forme suivante · Z annuler · H marteau · Entrée sortir / continuer</p>
         <button type="button" class="primary" (click)="closeHelp()">C’est parti</button>
       </div>
     </div>

@@ -1,8 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { allLegalMoves, applyMove, legalMoves } from './board';
 import { FLOOR_COUNT, generateFloor } from './generator';
-import { NO_MODS } from './perks';
-import { choosePerk, NO_BONUSES, nextFloor, playMove, retryFloor, RunState, startRun, undo } from './run';
+import { NO_MODS, ruleMods } from './perks';
+import {
+  choosePerk,
+  exitFloor,
+  floorStars,
+  LATE_CHEST_CHOICES,
+  NO_BONUSES,
+  nextFloor,
+  playMove,
+  retryFloor,
+  RunState,
+  startRun,
+  undo,
+} from './run';
 import { FloorDef, FloorState, MoveOption, ShapeKind } from './types';
 
 function replay(def: FloorDef): { floor: FloorState; damage: number } {
@@ -18,13 +30,13 @@ function replay(def: FloorDef): { floor: FloorState; damage: number } {
   };
   let damage = 0;
   for (const step of def.solution) {
-    // En jeu, l'étage se termine dès l'objectif atteint (et les sentinelles s'arrêtent).
+    // Le joueur peut sortir dès l'objectif atteint.
     if (floor.coins >= floor.target) break;
     const option = legalMoves(floor.board, step.pieceId).find(
       (candidate) => candidate.target.x === step.target.x && candidate.target.y === step.target.y,
     );
     expect(option, `coup ${JSON.stringify(step)} introuvable`).toBeDefined();
-    const result = applyMove(floor, option!, NO_MODS);
+    const result = applyMove(floor, option!, { ...NO_MODS, ...ruleMods(def.rule) });
     damage += result.damage;
     floor = result.floor;
   }
@@ -59,6 +71,13 @@ describe('generateFloor', () => {
     const def = generateFloor(123, 2, ['square', 'triangle'], 0);
     expect(def.board.items).toContain('chest');
   });
+
+  it('donne une règle spéciale aux seuls gardiens', () => {
+    for (let floor = 1; floor <= FLOOR_COUNT; floor++) {
+      const def = generateFloor(777, floor, ['square', 'triangle'], 0);
+      expect(def.rule !== null).toBe(def.guardian);
+    }
+  });
 });
 
 function firstMove(run: RunState): MoveOption {
@@ -84,7 +103,7 @@ describe('run', () => {
   it('termine l’étage en suivant la solution, puis passe au suivant', () => {
     let run = startRun(config);
     for (const step of run.def.solution) {
-      if (run.phase !== 'playing') break;
+      if (run.phase !== 'playing' || run.floor.coins >= run.floor.target) break;
       if (run.loot) run = choosePerk(run, run.loot[0]);
       const option = legalMoves(run.floor.board, step.pieceId).find(
         (candidate) => candidate.target.x === step.target.x && candidate.target.y === step.target.y,
@@ -92,19 +111,32 @@ describe('run', () => {
       run = playMove(run, option);
     }
     if (run.loot) run = choosePerk(run, run.loot[0]);
+    // L'objectif atteint ne termine pas l'étage : c'est au joueur de sortir.
+    if (run.phase === 'playing') {
+      expect(run.floor.coins).toBeGreaterThanOrEqual(run.floor.target);
+      run = exitFloor(run);
+    }
+    if (run.loot) run = choosePerk(run, run.loot[0]);
     expect(run.phase).toBe('cleared');
     expect(run.shards).toBeGreaterThan(0);
+    expect(run.stars).toHaveLength(1);
     run = nextFloor(run);
     expect(run.phase).toBe('playing');
     expect(run.def.number).toBe(2);
   });
 
-  it('coûte 1 PV quand les coups sont épuisés, puis permet de réessayer', () => {
+  it('offre le premier échec, puis coûte 1 PV quand les coups sont épuisés', () => {
     let run = startRun(config);
-    run = { ...run, floor: { ...run.floor, movesLeft: 1, target: 999 } };
-    run = playMove(run, firstMove(run));
+    const fail = (state: RunState) =>
+      playMove({ ...state, floor: { ...state.floor, movesLeft: 1, target: 999 } }, firstMove(state));
+    run = fail(run);
     expect(run.phase).toBe('failed');
-    expect(run.hp).toBeLessThan(3);
+    const afterFree = run.hp;
+    run = retryFloor(run);
+    expect(run.hp).toBe(afterFree);
+    run = fail(run);
+    expect(run.phase).toBe('failed');
+    expect(run.hp).toBeLessThan(afterFree);
     const hp = run.hp;
     run = retryFloor(run);
     expect(run.phase).toBe('playing');
@@ -115,8 +147,9 @@ describe('run', () => {
     expect(run.floor.board.items.includes('chest')).toBe(!run.chestTaken && run.def.board.items.includes('chest'));
   });
 
-  it('annule un coup si une annulation est disponible', () => {
-    let run = startRun({ ...config, bonuses: { ...NO_BONUSES, undos: 1 } });
+  it('offre une annulation de base à chaque étage', () => {
+    let run = startRun(config);
+    expect(run.floor.undosLeft).toBe(1);
     const before = run.floor;
     run = playMove(run, firstMove(run));
     if (run.loot) return;
@@ -124,6 +157,23 @@ describe('run', () => {
     expect(run.floor.board).toEqual(before.board);
     expect(run.floor.undosLeft).toBe(0);
     expect(undo(run)).toBe(run);
+  });
+
+  it('sort de l’étage seulement une fois l’objectif atteint, avec le coffre oublié', () => {
+    let run = startRun(config);
+    expect(exitFloor(run)).toBe(run);
+    run = { ...run, floor: { ...run.floor, coins: run.floor.target } };
+    run = exitFloor(run);
+    expect(run.phase).toBe('cleared');
+    expect(run.summary?.lateChest).toBe(true);
+    expect(run.loot).toHaveLength(LATE_CHEST_CHOICES);
+  });
+
+  it('attribue les étoiles selon le surplus et les coups gardés', () => {
+    expect(floorStars({ coins: 9, target: 10, movesLeft: 5 })).toBe(0);
+    expect(floorStars({ coins: 10, target: 10, movesLeft: 0 })).toBe(1);
+    expect(floorStars({ coins: 13, target: 10, movesLeft: 0 })).toBe(2);
+    expect(floorStars({ coins: 13, target: 10, movesLeft: 2 })).toBe(3);
   });
 
   it('applique immédiatement le Sablier et ajoute une forme recrue au prochain étage', () => {

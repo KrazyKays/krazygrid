@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyHammer, applyMove, legalMoves, stepSentinels } from './board';
+import { applyHammer, applyMove, legalMoves, sentinelForecast, stepSentinels } from './board';
 import { Mods, NO_MODS } from './perks';
 import { Board, FloorState, Item, Piece, Sentinel, Tile } from './types';
 
@@ -105,10 +105,40 @@ describe('applyMove', () => {
     expect(applyMove(floorOf(b), option, mods({ magnet: true })).coinsGained).toBe(1);
   });
 
-  it('fait aspirer les 8 cases voisines à l’Hexagone', () => {
-    const b = board(['o.o', '...', 'o.o'], [{ id: 0, kind: 'hexagon', x: 0, y: 1 }]);
+  it('fait aspirer les 4 cases adjacentes à l’Hexagone, les 8 avec l’Aimant', () => {
+    const b = board(['ooo', '..o', 'ooo'], [{ id: 0, kind: 'hexagon', x: 0, y: 1 }]);
     const option = legalMoves(b, 0).find((candidate) => candidate.landing.x === 1 && candidate.landing.y === 1)!;
-    expect(applyMove(floorOf(b), option, NO_MODS).coinsGained).toBe(4);
+    expect(applyMove(floorOf(b), option, NO_MODS).coinsGained).toBe(3);
+    expect(applyMove(floorOf(b), option, mods({ magnet: true })).coinsGained).toBe(7);
+  });
+
+  it('fait ramasser au Cercle la case survolée', () => {
+    const b = board(['.oo'], [{ id: 0, kind: 'circle', x: 0, y: 0 }]);
+    const [option] = legalMoves(b, 0);
+    expect(option.sweep).toEqual([{ x: 1, y: 0 }]);
+    expect(applyMove(floorOf(b), option, NO_MODS).coinsGained).toBe(2);
+  });
+
+  it('ne blesse pas le Cercle qui survole des pics', () => {
+    const b = board(['.^.'], [{ id: 0, kind: 'circle', x: 0, y: 0 }]);
+    expect(applyMove(floorOf(b), legalMoves(b, 0)[0], NO_MODS).damage).toBe(0);
+  });
+
+  it('fait ramasser au Losange la grande branche du L', () => {
+    const b = board(['o..', 'o..', 'oo.'], [{ id: 0, kind: 'diamond', x: 0, y: 0 }]);
+    const option = legalMoves(b, 0).find((candidate) => candidate.landing.x === 1 && candidate.landing.y === 2)!;
+    expect(option.sweep).toEqual([
+      { x: 0, y: 1 },
+      { x: 0, y: 2 },
+    ]);
+    expect(applyMove(floorOf(b), option, NO_MODS).coinsGained).toBe(3);
+  });
+
+  it('donne des pièces aux coups à vide avec l’Opportunisme', () => {
+    const b = board(['...'], [{ id: 0, kind: 'square', x: 0, y: 0 }]);
+    const option = legalMoves(b, 0)[0];
+    expect(applyMove(floorOf(b), option, NO_MODS).coinsGained).toBe(0);
+    expect(applyMove(floorOf(b), option, mods({ idleCoins: 2 })).coinsGained).toBe(2);
   });
 
   it('rend le premier coup gratuit avec l’Écho', () => {
@@ -139,6 +169,23 @@ describe('stepSentinels', () => {
     const b = board(['...'], [{ id: 0, kind: 'square', x: 1, y: 0 }], [{ id: 0, x: 0, y: 0, dx: 1, dy: 0 }]);
     expect(stepSentinels(b)).toEqual([{ x: 1, y: 0 }]);
     expect(b.sentinels[0]).toMatchObject({ x: 0, dx: -1 });
+  });
+
+  it('continue de patrouiller une fois l’objectif atteint', () => {
+    const b = board(['....', '....'], [{ id: 0, kind: 'square', x: 0, y: 1 }], [{ id: 0, x: 0, y: 0, dx: 1, dy: 0 }]);
+    const result = applyMove(floorOf(b, { target: 0 }), legalMoves(b, 0)[0], NO_MODS);
+    expect(result.floor.board.sentinels[0]).toMatchObject({ x: 1, y: 0 });
+  });
+
+  it('avance de 2 cases sous la Frénésie, et l’annonce', () => {
+    const b = board(['.....', '.....'], [{ id: 0, kind: 'square', x: 0, y: 1 }], [{ id: 0, x: 0, y: 0, dx: 1, dy: 0 }]);
+    const result = applyMove(floorOf(b), legalMoves(b, 0)[0], mods({ sentinelSteps: 2 }));
+    expect(result.floor.board.sentinels[0]).toMatchObject({ x: 2, y: 0 });
+    expect(sentinelForecast(b, 2)).toEqual([
+      { x: 1, y: 0 },
+      { x: 2, y: 0 },
+    ]);
+    expect(b.sentinels[0]).toMatchObject({ x: 0, y: 0 });
   });
 
   it('ne blesse pas avec la Carapace', () => {

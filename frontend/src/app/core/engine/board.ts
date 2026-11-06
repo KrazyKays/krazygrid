@@ -57,21 +57,21 @@ export const SHAPES: Record<ShapeKind, ShapeDef> = {
     name: 'Cercle',
     motion: 'leap',
     vectors: JUMP,
-    rule: 'Saute exactement 2 cases, par-dessus tout obstacle.',
+    rule: 'Saute exactement 2 cases, par-dessus tout obstacle, et ramasse la case survolée.',
   },
   diamond: {
     kind: 'diamond',
     name: 'Losange',
     motion: 'leap',
     vectors: KNIGHT,
-    rule: 'Bondit en L, comme un cavalier.',
+    rule: 'Bondit en L, comme un cavalier, et ramasse la grande branche du L.',
   },
   hexagon: {
     kind: 'hexagon',
     name: 'Hexagone',
     motion: 'leap',
     vectors: KING,
-    rule: 'Avance d’une case et aspire les objets des 8 cases autour.',
+    rule: 'Avance d’une case et aspire les objets des 4 cases adjacentes.',
   },
 };
 
@@ -122,7 +122,8 @@ export function legalMoves(board: Board, pieceId: number): MoveOption[] {
     if (shape.motion === 'leap') {
       const landing = { x: piece.x + dx, y: piece.y + dy };
       if (enterable(board, landing.x, landing.y)) {
-        options.push({ pieceId, target: landing, landing, path: [landing], breaks: null });
+        const sweep = sweepCells(piece, piece.kind, dx, dy).filter((cell) => inBounds(board, cell.x, cell.y));
+        options.push({ pieceId, target: landing, landing, path: [landing], sweep, breaks: null });
       }
       continue;
     }
@@ -140,7 +141,7 @@ export function legalMoves(board: Board, pieceId: number): MoveOption[] {
       continue;
     }
     const landing = { x, y };
-    options.push({ pieceId, target: path.length > 0 ? landing : breaks!, landing, path, breaks });
+    options.push({ pieceId, target: path.length > 0 ? landing : breaks!, landing, path, sweep: [], breaks });
   }
   return options;
 }
@@ -149,9 +150,33 @@ export function allLegalMoves(board: Board): MoveOption[] {
   return board.pieces.flatMap((piece) => legalMoves(board, piece.id));
 }
 
-/** Cases voisines dont les objets sont aspirés en fin de coup. */
+/**
+ * Cases ramassées en vol par un saut : la case survolée par le Cercle,
+ * la grande branche du L (hors case d'arrivée) pour le Losange.
+ */
+function sweepCells(from: Cell, kind: ShapeKind, dx: number, dy: number): Cell[] {
+  if (kind === 'circle') {
+    return [{ x: from.x + dx / 2, y: from.y + dy / 2 }];
+  }
+  if (kind === 'diamond') {
+    const sx = Math.sign(dx);
+    const sy = Math.sign(dy);
+    return Math.abs(dy) === 2
+      ? [
+          { x: from.x, y: from.y + sy },
+          { x: from.x, y: from.y + 2 * sy },
+        ]
+      : [
+          { x: from.x + sx, y: from.y },
+          { x: from.x + 2 * sx, y: from.y },
+        ];
+  }
+  return [];
+}
+
+/** Cases voisines dont les objets sont aspirés en fin de coup. Hexagone + Aimant : les 8 cases. */
 function pullCells(board: Board, kind: ShapeKind, landing: Cell, mods: Mods): Cell[] {
-  const vectors = kind === 'hexagon' ? KING : mods.magnet ? ORTHO : [];
+  const vectors = kind === 'hexagon' ? (mods.magnet ? KING : ORTHO) : mods.magnet ? ORTHO : [];
   return vectors
     .map(([dx, dy]) => ({ x: landing.x + dx, y: landing.y + dy }))
     .filter((cell) => inBounds(board, cell.x, cell.y));
@@ -216,11 +241,17 @@ export function applyMove(floor: FloorState, option: MoveOption, mods: Mods): Mo
     }
     collect(cell);
   });
+  for (const cell of option.sweep) {
+    collect(cell);
+  }
   for (const cell of pullCells(board, piece.kind, option.landing, mods)) {
     collect(cell);
   }
   if (mods.momentum) {
     result.coinsGained += Math.max(0, result.collected.length - 2);
+  }
+  if (result.collected.length === 0) {
+    result.coinsGained += mods.idleCoins;
   }
 
   const free = mods.echo && floor.turn === 0;
@@ -229,7 +260,8 @@ export function applyMove(floor: FloorState, option: MoveOption, mods: Mods): Mo
   next.movesLeft = floor.movesLeft - (free ? 0 : 1);
   next.turn = floor.turn + 1;
 
-  if (next.coins < next.target) {
+  // Les sentinelles continuent de patrouiller même une fois l'objectif atteint : rester coûte du risque.
+  for (let round = 0; round < mods.sentinelSteps; round++) {
     for (const hit of stepSentinels(board)) {
       if (!mods.carapace) {
         result.damage++;
@@ -249,7 +281,7 @@ export function applyMove(floor: FloorState, option: MoveOption, mods: Mods): Mo
  * Chaque sentinelle avance d'une case sur son axe et fait demi-tour contre un obstacle.
  * Si elle percute une forme, elle la blesse et rebondit. Retourne les cases des formes blessées.
  */
-export function stepSentinels(board: Board): Cell[] {
+export function stepSentinels(board: Board, reached?: Cell[]): Cell[] {
   const hits: Cell[] = [];
   for (const sentinel of board.sentinels) {
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -258,6 +290,7 @@ export function stepSentinels(board: Board): Cell[] {
       const piece = board.pieces.find((candidate) => candidate.x === x && candidate.y === y);
       if (piece) {
         hits.push({ x, y });
+        reached?.push({ x, y });
         sentinel.dx = -sentinel.dx;
         sentinel.dy = -sentinel.dy;
         break;
@@ -267,6 +300,7 @@ export function stepSentinels(board: Board): Cell[] {
       if (!blocked) {
         sentinel.x = x;
         sentinel.y = y;
+        reached?.push({ x, y });
         break;
       }
       sentinel.dx = -sentinel.dx;
@@ -274,6 +308,16 @@ export function stepSentinels(board: Board): Cell[] {
     }
   }
   return hits;
+}
+
+/** Cases que les sentinelles atteindront (ou frapperont) pendant les `steps` prochains déplacements. */
+export function sentinelForecast(board: Board, steps: number): Cell[] {
+  const copy = cloneBoard(board);
+  const reached: Cell[] = [];
+  for (let step = 0; step < steps; step++) {
+    stepSentinels(copy, reached);
+  }
+  return reached;
 }
 
 /** Utilise une charge de Marteau sur un mur ou un bloc fragile. */

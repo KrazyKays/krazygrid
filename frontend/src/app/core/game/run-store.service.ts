@@ -35,6 +35,12 @@ export class RunStore {
     return travel ? 90 + travel.steps * 65 : 0;
   });
 
+  /** Objectif atteint : le joueur peut sortir quand il veut. */
+  readonly canExit = computed(() => {
+    const run = this.run();
+    return !!run && run.phase === 'playing' && !run.loot && engine.quotaMet(run);
+  });
+
   readonly canAct = computed(() => {
     const run = this.run();
     return !!run && run.phase === 'playing' && !run.loot;
@@ -130,6 +136,11 @@ export class RunStore {
 
   undo(): void {
     this.mutate(engine.undo);
+  }
+
+  exit(): void {
+    this.hammerMode.set(false);
+    this.mutate(engine.exitFloor);
   }
 
   retry(): void {

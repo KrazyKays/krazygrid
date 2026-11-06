@@ -2,6 +2,9 @@ export type ShapeKind = 'square' | 'triangle' | 'circle' | 'diamond' | 'hexagon'
 export type Tile = 'floor' | 'wall' | 'spike' | 'crack';
 export type Item = 'coin' | 'gem' | 'chest' | 'heart';
 
+/** Règle spéciale d'un étage gardien. */
+export type GuardianRule = 'frenzy' | 'treasure' | 'blackout' | 'swarm' | 'thorns';
+
 export interface Cell {
   x: number;
   y: number;
@@ -34,6 +37,8 @@ export interface FloorDef {
   number: number;
   seed: number;
   guardian: boolean;
+  /** Règle spéciale de l'étage gardien (null sur un étage normal). */
+  rule: GuardianRule | null;
   board: Board;
   target: number;
   baseMoves: number;
@@ -60,6 +65,8 @@ export interface MoveOption {
   landing: Cell;
   /** Cases traversées dans l'ordre, case d'atterrissage incluse. */
   path: Cell[];
+  /** Cases ramassées sans être traversées (survol du Cercle, jambe du L du Losange). */
+  sweep: Cell[];
   /** Bloc fragile brisé par l'impact. */
   breaks: Cell | null;
 }

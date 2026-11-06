@@ -25,7 +25,7 @@ export interface UpgradeDef {
 export const UPGRADES: UpgradeDef[] = [
   { id: 'vitality', name: 'Vitalité', description: '+1 PV au départ de chaque run.', icon: '♥', costs: [15, 40, 90] },
   { id: 'endurance', name: 'Endurance', description: '+1 coup à chaque étage.', icon: '⧗', costs: [30, 80] },
-  { id: 'memory', name: 'Mémoire', description: '+1 annulation à chaque étage.', icon: '↺', costs: [20, 60] },
+  { id: 'memory', name: 'Mémoire', description: '+2 annulations à chaque étage.', icon: '↺', costs: [20, 60] },
   { id: 'dice', name: 'Dés pipés', description: '+1 relance de coffre par run.', icon: '⚄', costs: [15, 35, 70] },
   { id: 'kit', name: 'Paquetage', description: 'Commence chaque run en ouvrant un coffre.', icon: '▣', costs: [45] },
   {
@@ -148,7 +148,7 @@ export function bonusesFromMeta(meta: MetaState): RunBonuses {
   return {
     hp: level('vitality'),
     moves: level('endurance'),
-    undos: level('memory'),
+    undos: 2 * level('memory'),
     hammers: level('hammer'),
     rerolls: level('dice'),
     startingChest: level('kit') > 0,
